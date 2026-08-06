@@ -30,16 +30,23 @@ jobs:
             echo "✓ Using permanent keystore"
             echo "$KS" | base64 -d > app/release.keystore
           else
-            echo "⚠️ Generating temporary keystore (signature will change each build)"
+            echo "⚠️ Generating temporary keystore"
             keytool -genkeypair \
               -keystore app/release.keystore \
               -alias vehicle \
               -keyalg RSA -keysize 2048 -validity 36500 \
               -storepass vehicle2024 -keypass vehicle2024 \
               -dname "CN=VehicleManager, OU=Dev, O=Vehicle, L=Beijing, ST=Beijing, C=CN"
-            base64 -w0 app/release.keystore > ks.b64
-            echo "KEYSTORE_BASE64=$(cat ks.b64)" >> $GITHUB_ENV
+            echo "⚠️ Download keystore artifact and set as GitHub Secret KEYSTORE_BASE64"
           fi
+
+      - name: Upload Keystore (first-time only)
+        if: env.KS == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: keystore-setup
+          path: app/release.keystore
+          retention-days: 1
 
       - name: Grant gradlew permission
         run: chmod +x gradlew
