@@ -22,17 +22,35 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Generate Keystore
+      - name: Setup Keystore
         run: |
-          keytool -genkeypair \
-            -keystore app/release.keystore \
-            -alias vehicle \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 36500 \
-            -storepass vehicle2024 \
-            -keypass vehicle2024 \
-            -dname "CN=VehicleManager, OU=Dev, O=Vehicle, L=Beijing, ST=Beijing, C=CN"
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Using permanent keystore from GitHub Secret"
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+          else
+            echo "⚠️ No KEYSTORE_BASE64 secret found — generating temporary keystore"
+            echo "⚠️ Each build will have a DIFFERENT signature until you save the secret!"
+            echo "⚠️ Steps: download the keystore artifact below, then:"
+            echo "⚠️   gh secret set KEYSTORE_BASE64 -b\"\$(base64 -i release.keystore)\""
+            keytool -genkeypair \
+              -keystore app/release.keystore \
+              -alias vehicle \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 36500 \
+              -storepass vehicle2024 \
+              -keypass vehicle2024 \
+              -dname "CN=VehicleManager, OU=Dev, O=Vehicle, L=Beijing, ST=Beijing, C=CN"
+            cp app/release.keystore release.keystore
+          fi
+
+      - name: Upload Keystore Artifact (for first-time setup)
+        if: ${{ !secrets.KEYSTORE_BASE64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: keystore-for-secret-setup
+          path: release.keystore
+          retention-days: 1
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -47,8 +65,7 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
 
       - name: Rename APK
-        run: |
-          cp app/build/outputs/apk/release/app-release.apk VehicleManager.apk
+        run: cp app/build/outputs/apk/release/app-release.apk VehicleManager.apk
 
       - name: Create Release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
