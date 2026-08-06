@@ -1,92 +1,270 @@
 package com.vehiclemanager.ui.todo
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Icon
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.vehiclemanager.VehicleApp
-import com.vehiclemanager.data.entity.Vehicle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vehiclemanager.data.entity.Todo
+import com.vehiclemanager.ui.components.*
 import com.vehiclemanager.ui.theme.*
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
+import com.vehiclemanager.util.DateUtils
+import com.vehiclemanager.viewmodel.TodoViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodoScreen(onBack: () -> Unit) {
-    val ctx = LocalContext.current; val app = ctx.applicationContext as VehicleApp; val sc = rememberCoroutineScope()
-    var vehicles by remember { mutableStateOf<List<Vehicle>>(emptyList()) }
-    LaunchedEffect(Unit) { sc.launch { vehicles = app.database.vehicleDao().getAllVehiclesList() } }
+fun TodoScreen(
+    viewModel: TodoViewModel = viewModel(),
+    onBack: () -> Unit
+) {
+    val state by viewModel.uiState.collectAsState()
 
-    val overdue = vehicles.filter { isOverdue(it) }
-    val near = vehicles.filter { !isOverdue(it) && remainingKm(it) in 1..70 }
-    val insp = vehicles.filter { it.annualInspectionDate > 0 && monthsUntil(it.annualInspectionDate) in 1..3 }
+    LaunchedEffect(Unit) {
+        viewModel.refreshTodos()
+    }
 
-    Scaffold(topBar = { TopAppBar(title={Text("提醒中心",fontWeight=FontWeight.Bold)},navigationIcon={IconButton(onClick=onBack){Icon(Icons.Default.ArrowBack,"")}},colors=TopAppBarDefaults.topAppBarColors(containerColor=Blue700,titleContentColor=Color.White,navigationIconContentColor=Color.White))}) { p ->
-        LazyColumn(Modifier.fillMaxSize().padding(p).padding(12.dp), verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            if (overdue.isNotEmpty()) { item{Text("🔴 逾期保养 (${overdue.size})",fontWeight=FontWeight.Bold,fontSize=16.sp,color=ErrorRed)}; items(overdue){RemCard(it,"urgent")} }
-            if (near.isNotEmpty()) { item{Text("🟡 即将保养 (${near.size})",fontWeight=FontWeight.Bold,fontSize=16.sp,color=Orange700,modifier=Modifier.padding(top=8.dp))}; items(near){RemCard(it,"near")} }
-            if (insp.isNotEmpty()) { item{Text("🔵 年审提醒 (${insp.size})",fontWeight=FontWeight.Bold,fontSize=16.sp,color=Blue700,modifier=Modifier.padding(top=8.dp))}
-                items(insp){v->Card(modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),colors=CardDefaults.cardColors(containerColor=Blue50)){
-                    Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){
-                        Surface(shape=RoundedCornerShape(50.dp),color=Blue700.copy(alpha=0.1f),modifier=Modifier.size(40.dp)){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Icon(Icons.Default.Gavel,null,tint=Blue700,modifier=Modifier.size(20.dp))}}
-                        Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(v.plateNumber,fontWeight=FontWeight.Bold,fontSize=14.sp);Text("审车: ${fmtDate(v.annualInspectionDate)} · 剩${monthsUntil(v.annualInspectionDate)}个月",fontSize=12.sp,color=Color(0xFF5f6368))}}}}}
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("待办事项", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, "返回")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Blue700,
+                    titleContentColor = TextOnPrimary,
+                    navigationIconContentColor = TextOnPrimary
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = state.filterType == null,
+                    onClick = { viewModel.filterByType(null) },
+                    label = { Text("全部") }
+                )
+                FilterChip(
+                    selected = state.filterType == "保养",
+                    onClick = { viewModel.filterByType("保养") },
+                    label = { Text("保养") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Build, null, modifier = Modifier.size(16.dp))
+                    }
+                )
+                FilterChip(
+                    selected = state.filterType == "年审",
+                    onClick = { viewModel.filterByType("年审") },
+                    label = { Text("年审") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Gavel, null, modifier = Modifier.size(16.dp))
+                    }
+                )
+                FilterChip(
+                    selected = state.filterType == "维修",
+                    onClick = { viewModel.filterByType("维修") },
+                    label = { Text("维修") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Construction, null, modifier = Modifier.size(16.dp))
+                    }
+                )
             }
-            if(overdue.isEmpty()&&near.isEmpty()&&insp.isEmpty()){item{Box(Modifier.fillMaxWidth().padding(48.dp),contentAlignment=Alignment.Center){Text("✅ 一切正常",color=Color(0xFF34a853),fontSize=16.sp)}}}
-            item{Spacer(Modifier.height(16.dp))}
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Summary
+                item {
+                    val pending = state.todos.count { it.status == "待处理" }
+                    val completed = state.todos.count { it.status == "已完成" }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatCard(
+                            title = "待处理",
+                            value = "$pending",
+                            icon = Icons.Default.PendingActions,
+                            backgroundColor = WarningOrange,
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "已完成",
+                            value = "$completed",
+                            icon = Icons.Default.CheckCircle,
+                            backgroundColor = SuccessGreen,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                items(state.todos, key = { it.id }) { todo ->
+                    TodoCard(
+                        todo = todo,
+                        onComplete = { viewModel.completeTodo(todo) },
+                        onDelete = { viewModel.deleteTodo(todo) }
+                    )
+                }
+
+                if (state.todos.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Default.CheckCircle, null,
+                                    tint = TextSecondary.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("暂无待办事项", color = TextSecondary, fontSize = 16.sp)
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(modifier = Modifier.height(40.dp)) }
+            }
         }
     }
 }
 
 @Composable
-fun RemCard(v: Vehicle, level: String) {
-    val bg = if(level=="urgent") ErrorRed.copy(alpha=0.05f) else Orange50
-    val bd = if(level=="urgent") ErrorRed.copy(alpha=0.3f) else Orange700.copy(alpha=0.3f)
-    Card(modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),colors=CardDefaults.cardColors(containerColor=bg),border=BorderStroke(1.dp,bd)){
-        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){
-            Surface(shape=RoundedCornerShape(50.dp),color=if(level=="urgent")ErrorRed.copy(alpha=0.1f) else Orange700.copy(alpha=0.1f),modifier=Modifier.size(40.dp)){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Icon(if(level=="urgent")Icons.Default.Error else Icons.Default.Warning,null,tint=if(level=="urgent")ErrorRed else Orange700,modifier=Modifier.size(20.dp))}}
-            Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(v.plateNumber,fontWeight=FontWeight.Bold,fontSize=14.sp);Text("${v.brand} · ${v.assignedUser}",fontSize=12.sp,color=Color(0xFF5f6368));Text(if(isOverdue(v))"保养已逾期！需立即保养" else "还剩 ${remainingKm(v)} km 需保养",fontSize=12.sp,color=if(isOverdue(v))ErrorRed else Color(0xFF5f6368))}
-            if(isOverdue(v)){Surface(shape=RoundedCornerShape(8.dp),color=ErrorRed.copy(alpha=0.1f)){Text("立即保养",Modifier.padding(horizontal=8.dp,vertical=4.dp),fontSize=11.sp,color=ErrorRed,fontWeight=FontWeight.Bold)}}
+fun TodoCard(
+    todo: Todo,
+    onComplete: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val daysLeft = if (todo.dueDate > 0) {
+        (todo.dueDate - System.currentTimeMillis()) / (24 * 60 * 60 * 1000)
+    } else 0L
+
+    val accentColor = when (todo.type) {
+        "年审" -> Blue700
+        "保养" -> Orange700
+        "维修" -> SuccessGreen
+        else -> TextSecondary
+    }
+
+    val urgencyColor = when {
+        todo.status == "已完成" -> SuccessGreen
+        daysLeft < 0 -> ErrorRed
+        daysLeft <= 7 -> WarningOrange
+        else -> accentColor
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (todo.status == "待处理") 2.dp else 0.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (todo.status == "已完成")
+                SurfaceLight.copy(alpha = 0.5f) else Background
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    when (todo.type) {
+                        "年审" -> Icons.Default.Gavel
+                        "保养" -> Icons.Default.Build
+                        else -> Icons.Default.Construction
+                    },
+                    null,
+                    tint = if (todo.status == "已完成") TextSecondary else accentColor,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        todo.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = if (todo.status == "已完成") TextSecondary else TextPrimary
+                    )
+                    if (todo.description.isNotBlank()) {
+                        Text(
+                            todo.description.lines().first(),
+                            fontSize = 13.sp,
+                            color = TextSecondary,
+                            maxLines = 2
+                        )
+                    }
+                }
+                StatusBadge(todo.status)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (todo.dueDate > 0) {
+                    val dayText = when {
+                        daysLeft < 0 -> "已过期 ${-daysLeft} 天"
+                        daysLeft == 0L -> "今天截止"
+                        else -> "剩余 $daysLeft 天"
+                    }
+                    Text(
+                        "📅 ${DateUtils.formatDate(todo.dueDate)} · $dayText",
+                        fontSize = 12.sp,
+                        color = if (todo.status == "已处理") TextSecondary else urgencyColor
+                    )
+                } else {
+                    Text("📅 未设置日期", fontSize = 12.sp, color = TextSecondary)
+                }
+
+                if (todo.status == "待处理") {
+                    Row {
+                        TextButton(onClick = onComplete) {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp), tint = SuccessGreen)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("完成", color = SuccessGreen, fontSize = 13.sp)
+                        }
+                        TextButton(onClick = onDelete) {
+                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp), tint = ErrorRed)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("删除", color = ErrorRed, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
         }
     }
-}
-
-// helpers: parse notes field for rule/next info
-private fun parseNext(notes: String): Int {
-    val next = Regex("下次:([^ ]*)").find(notes)?.groupValues?.get(1) ?: ""
-    return Regex("([\\d,]+)").find(next)?.value?.replace(",","")?.toIntOrNull() ?: 0
-}
-private fun parseRuleKm(notes: String): Int {
-    val rule = Regex("规则:([^ ]*)").find(notes)?.groupValues?.get(1) ?: ""
-    val m = Regex("(\\d+)\\s*千公里").find(rule) ?: Regex("(\\d+)公里").find(rule)
-    return m?.groupValues?.get(1)?.toIntOrNull()?.times(1000) ?: 3000
-}
-private fun remainingKm(v: Vehicle): Int {
-    val cur = v.lastMaintenanceKm
-    val nxt = parseNext(v.notes)
-    return if(cur > 0 && nxt > 0) nxt - cur else 0
-}
-private fun isOverdue(v: Vehicle): Boolean {
-    val rem = remainingKm(v)
-    return v.lastMaintenanceKm > 0 && rem < 0
-}
-private fun monthsUntil(ts: Long): Int {
-    if(ts == 0L) return 999
-    val now = System.currentTimeMillis()
-    return ((ts - now) / (30L * 24 * 3600 * 1000)).toInt()
-}
-private fun fmtDate(ts: Long): String {
-    if(ts == 0L) return ""
-    return SimpleDateFormat("yyyy年M月", Locale.CHINA).format(Date(ts))
 }
