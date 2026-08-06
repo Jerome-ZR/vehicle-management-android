@@ -21,6 +21,9 @@ interface MaintenanceRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecord(record: MaintenanceRecord): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(records: List<MaintenanceRecord>)
+
     @Update
     suspend fun updateRecord(record: MaintenanceRecord)
 

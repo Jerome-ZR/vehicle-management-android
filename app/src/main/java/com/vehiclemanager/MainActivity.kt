@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.vehiclemanager.backup.BackupScreen
+import com.vehiclemanager.data.SeedData
 import com.vehiclemanager.ui.home.HomeScreen
 import com.vehiclemanager.ui.kmrecord.KmRecordScreen
 import com.vehiclemanager.ui.maintenance.MaintenanceScreen
@@ -18,10 +19,18 @@ import com.vehiclemanager.ui.parts.PartsScreen
 import com.vehiclemanager.ui.theme.VehicleManagerTheme
 import com.vehiclemanager.ui.todo.TodoScreen
 import com.vehiclemanager.ui.vehicle.VehicleScreen
+import kotlinx.coroutines.*
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val app = applicationContext as VehicleApp
+        CoroutineScope(Dispatchers.IO).launch {
+            SeedData.seedAll(app.database)
+            if (app.database.partDao().getAllList().isEmpty()) {
+                app.database.partDao().insertAll(SeedData.getParts())
+            }
+        }
         enableEdgeToEdge()
         setContent {
             VehicleManagerTheme {

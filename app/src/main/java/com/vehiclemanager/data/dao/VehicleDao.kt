@@ -18,6 +18,9 @@ interface VehicleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVehicle(vehicle: Vehicle): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(vehicles: List<Vehicle>)
+
     @Update
     suspend fun updateVehicle(vehicle: Vehicle)
 
