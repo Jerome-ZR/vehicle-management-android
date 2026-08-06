@@ -130,18 +130,18 @@ object ExcelUtil {
 
         vehicles.forEachIndexed { index, vehicle ->
             val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(vehicle.plateNumber); cellStyle = cellStyle }
-            row.createCell(1).apply { setCellValue(vehicle.vehicleCode); cellStyle = cellStyle }
-            row.createCell(2).apply { setCellValue(vehicle.assignedUser); cellStyle = cellStyle }
-            row.createCell(3).apply { setCellValue(vehicle.brand); cellStyle = cellStyle }
-            row.createCell(4).apply { setCellValue(formatDate(vehicle.purchaseDate)); cellStyle = cellStyle }
-            row.createCell(5).apply { setCellValue(formatDate(vehicle.lastMaintenanceDate)); cellStyle = cellStyle }
-            row.createCell(6).apply { setCellValue(vehicle.lastMaintenanceKm.toDouble()); cellStyle = cellStyle }
-            row.createCell(7).apply { setCellValue(vehicle.maintenanceIntervalKm.toDouble()); cellStyle = cellStyle }
-            row.createCell(8).apply { setCellValue(vehicle.maintenanceIntervalDays.toDouble()); cellStyle = cellStyle }
-            row.createCell(9).apply { setCellValue(formatDate(vehicle.annualInspectionDate)); cellStyle = cellStyle }
-            row.createCell(10).apply { setCellValue(vehicle.status); cellStyle = cellStyle }
-            row.createCell(11).apply { setCellValue(vehicle.notes); cellStyle = cellStyle }
+            row.createCell(0).apply { setCellValue(vehicle.plateNumber); setCellStyle(cellStyle) }
+            row.createCell(1).apply { setCellValue(vehicle.vehicleCode); setCellStyle(cellStyle) }
+            row.createCell(2).apply { setCellValue(vehicle.assignedUser); setCellStyle(cellStyle) }
+            row.createCell(3).apply { setCellValue(vehicle.brand); setCellStyle(cellStyle) }
+            row.createCell(4).apply { setCellValue(formatDate(vehicle.purchaseDate)); setCellStyle(cellStyle) }
+            row.createCell(5).apply { setCellValue(formatDate(vehicle.lastMaintenanceDate)); setCellStyle(cellStyle) }
+            row.createCell(6).apply { setCellValue(vehicle.lastMaintenanceKm.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(7).apply { setCellValue(vehicle.maintenanceIntervalKm.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(8).apply { setCellValue(vehicle.maintenanceIntervalDays.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(9).apply { setCellValue(formatDate(vehicle.annualInspectionDate)); setCellStyle(cellStyle) }
+            row.createCell(10).apply { setCellValue(vehicle.status); setCellStyle(cellStyle) }
+            row.createCell(11).apply { setCellValue(vehicle.notes); setCellStyle(cellStyle) }
         }
 
         // Auto-size columns
@@ -160,14 +160,14 @@ object ExcelUtil {
 
         records.forEachIndexed { index, record ->
             val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(record.vehicleId.toDouble()); cellStyle = cellStyle }
-            row.createCell(1).apply { setCellValue(record.type); cellStyle = cellStyle }
-            row.createCell(2).apply { setCellValue(formatDate(record.date)); cellStyle = cellStyle }
-            row.createCell(3).apply { setCellValue(record.km.toDouble()); cellStyle = cellStyle }
-            row.createCell(4).apply { setCellValue(record.items); cellStyle = cellStyle }
-            row.createCell(5).apply { setCellValue(record.location); cellStyle = cellStyle }
-            row.createCell(6).apply { setCellValue(record.price); cellStyle = cellStyle }
-            row.createCell(7).apply { setCellValue(record.notes); cellStyle = cellStyle }
+            row.createCell(0).apply { setCellValue(record.vehicleId.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(1).apply { setCellValue(record.type); setCellStyle(cellStyle) }
+            row.createCell(2).apply { setCellValue(formatDate(record.date)); setCellStyle(cellStyle) }
+            row.createCell(3).apply { setCellValue(record.km.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(4).apply { setCellValue(record.items); setCellStyle(cellStyle) }
+            row.createCell(5).apply { setCellValue(record.location); setCellStyle(cellStyle) }
+            row.createCell(6).apply { setCellValue(record.price); setCellStyle(cellStyle) }
+            row.createCell(7).apply { setCellValue(record.notes); setCellStyle(cellStyle) }
         }
 
         for (i in headers.indices) sheet.autoSizeColumn(i)
@@ -183,10 +183,10 @@ object ExcelUtil {
 
         records.forEachIndexed { index, record ->
             val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(record.vehicleId.toDouble()); cellStyle = cellStyle }
-            row.createCell(1).apply { setCellValue(record.km.toDouble()); cellStyle = cellStyle }
-            row.createCell(2).apply { setCellValue(formatDate(record.recordDate)); cellStyle = cellStyle }
-            row.createCell(3).apply { setCellValue(record.month); cellStyle = cellStyle }
+            row.createCell(0).apply { setCellValue(record.vehicleId.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(1).apply { setCellValue(record.km.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(2).apply { setCellValue(formatDate(record.recordDate)); setCellStyle(cellStyle) }
+            row.createCell(3).apply { setCellValue(record.month); setCellStyle(cellStyle) }
         }
 
         for (i in headers.indices) sheet.autoSizeColumn(i)
@@ -202,12 +202,12 @@ object ExcelUtil {
 
         todos.forEachIndexed { index, todo ->
             val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(todo.vehicleId.toDouble()); cellStyle = cellStyle }
-            row.createCell(1).apply { setCellValue(todo.type); cellStyle = cellStyle }
-            row.createCell(2).apply { setCellValue(todo.title); cellStyle = cellStyle }
-            row.createCell(3).apply { setCellValue(todo.description); cellStyle = cellStyle }
-            row.createCell(4).apply { setCellValue(formatDate(todo.dueDate)); cellStyle = cellStyle }
-            row.createCell(5).apply { setCellValue(todo.status); cellStyle = cellStyle }
+            row.createCell(0).apply { setCellValue(todo.vehicleId.toDouble()); setCellStyle(cellStyle) }
+            row.createCell(1).apply { setCellValue(todo.type); setCellStyle(cellStyle) }
+            row.createCell(2).apply { setCellValue(todo.title); setCellStyle(cellStyle) }
+            row.createCell(3).apply { setCellValue(todo.description); setCellStyle(cellStyle) }
+            row.createCell(4).apply { setCellValue(formatDate(todo.dueDate)); setCellStyle(cellStyle) }
+            row.createCell(5).apply { setCellValue(todo.status); setCellStyle(cellStyle) }
         }
 
         for (i in headers.indices) sheet.autoSizeColumn(i)
