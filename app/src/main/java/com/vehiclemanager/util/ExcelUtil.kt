@@ -5,10 +5,6 @@ import android.net.Uri
 import com.vehiclemanager.data.entity.*
 import org.apache.poi.ss.usermodel.*
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
-import java.io.InputStream
-import java.io.OutputStream
-import java.text.SimpleDateFormat
-import java.util.*
 
 data class ExportData(
     val vehicles: List<Vehicle>,
@@ -18,259 +14,155 @@ data class ExportData(
 )
 
 object ExcelUtil {
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA)
 
     fun exportToExcel(context: Context, uri: Uri, data: ExportData) {
-        val workbook = XSSFWorkbook()
-        val headerStyle = createHeaderStyle(workbook)
-        val cellStyle = createCellStyle(workbook)
+        val wb = XSSFWorkbook()
+        val hs = headerStyle(wb); val cs = cellStyle(wb)
 
-        // Sheet 1: 车辆档案
-        createVehicleSheet(workbook, data.vehicles, headerStyle, cellStyle)
-        // Sheet 2: 维修保养记录
-        createMaintenanceSheet(workbook, data.maintenanceRecords, headerStyle, cellStyle)
-        // Sheet 3: 公里数记录
-        createKmRecordSheet(workbook, data.kmRecords, headerStyle, cellStyle)
-        // Sheet 4: 待办事项
-        createTodoSheet(workbook, data.todos, headerStyle, cellStyle)
-
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            workbook.write(outputStream)
+        // Sheet 1: 保养跟踪表 (matching user's actual Excel columns)
+        val s1 = wb.createSheet("保养跟踪表")
+        val h1 = arrayOf("车身编号","车牌号","车辆类型","当前公里数","应保养公里数","保养规则","上次保养时间","上次保养公里数","下次保养到期","备注","审车日期")
+        row(s1, 0, h1, hs)
+        data.vehicles.forEachIndexed { i, v ->
+            val r = s1.createRow(i + 1)
+            r.cell(0, v.vehicleCode, cs)             // 车身编号 (use vehicleCode for now)
+            r.cell(1, v.plateNumber, cs)             // 车牌号
+            r.cell(2, v.brand.ifBlank { "警用摩托车" }, cs) // 车辆类型 (use brand as type)
+            r.cell(3, "${v.lastMaintenanceKm} km", cs)     // 当前公里数 (approximate)
+            r.cell(4, "${v.lastMaintenanceKm + v.maintenanceIntervalKm} km", cs) // 应保养公里数
+            r.cell(5, "1年或${v.maintenanceIntervalKm/1000}千公里", cs)           // 保养规则
+            r.cell(6, if(v.lastMaintenanceDate>0) formatDate(v.lastMaintenanceDate) else "", cs)
+            r.cell(7, "${v.lastMaintenanceKm} km", cs)
+            r.cell(8, "", cs)
+            r.cell(9, v.notes.ifBlank { "使用人: ${v.assignedUser}" }, cs)
+            r.cell(10, if(v.annualInspectionDate>0) formatDate(v.annualInspectionDate) else "", cs)
         }
-        workbook.close()
+        for (c in h1.indices) s1.autoSizeColumn(c)
+
+        // Sheet 2: 维修记录总表
+        val s2 = wb.createSheet("维修记录总表")
+        row(s2, 0, arrayOf("车牌号","时间","维修地点","维修项目","价格"), hs)
+        data.maintenanceRecords.forEachIndexed { i, r ->
+            val r2 = s2.createRow(i + 1)
+            r2.cell(0, "", cs) // vehicleId as plate code placeholder
+            r2.cell(1, formatDate(r.date), cs)
+            r2.cell(2, r.location, cs)
+            r2.cell(3, r.items, cs)
+            r2.cell(4, r.price.toString(), cs)
+        }
+        for (c in 0..4) s2.autoSizeColumn(c)
+
+        // Sheet 3: 公里数记录
+        val s3 = wb.createSheet("公里数记录")
+        row(s3, 0, arrayOf("车辆ID","公里数","记录日期","所属月份"), hs)
+        data.kmRecords.forEachIndexed { i, r ->
+            val r3 = s3.createRow(i + 1)
+            r3.cell(0, r.vehicleId.toString(), cs); r3.cell(1, r.km.toString(), cs)
+            r3.cell(2, formatDate(r.recordDate), cs); r3.cell(3, r.month, cs)
+        }
+        for (c in 0..3) s3.autoSizeColumn(c)
+
+        context.contentResolver.openOutputStream(uri)?.use { wb.write(it) }
+        wb.close()
     }
 
     fun importFromExcel(context: Context, uri: Uri): ExportData {
         val vehicles = mutableListOf<Vehicle>()
-        val maintenanceRecords = mutableListOf<MaintenanceRecord>()
-        val kmRecords = mutableListOf<KmRecord>()
-        val todos = mutableListOf<Todo>()
+        val records = mutableListOf<MaintenanceRecord>()
+        val kmRecs = mutableListOf<KmRecord>()
 
-        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-            val workbook = WorkbookFactory.create(inputStream)
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+            val wb = WorkbookFactory.create(stream)
 
-            // Read vehicles
-            workbook.getSheetAt(0)?.let { sheet ->
-                for (i in 1..sheet.lastRowNum) {
-                    val row = sheet.getRow(i) ?: continue
-                    vehicles.add(
-                        Vehicle(
-                            plateNumber = row.getCellString(0),
-                            vehicleCode = row.getCellString(1),
-                            assignedUser = row.getCellString(2),
-                            brand = row.getCellString(3),
-                            purchaseDate = parseDateSafely(row.getCellString(4)),
-                            lastMaintenanceDate = parseDateSafely(row.getCellString(5)),
-                            lastMaintenanceKm = row.getCellInt(6),
-                            maintenanceIntervalKm = row.getCellInt(7).coerceAtLeast(1000),
-                            maintenanceIntervalDays = row.getCellInt(8).coerceAtLeast(30),
-                            annualInspectionDate = parseDateSafely(row.getCellString(9)),
-                            status = row.getCellString(10).ifBlank { "正常" },
-                            notes = row.getCellString(11)
-                        )
-                    )
+            // Sheet 1: 保养跟踪表
+            val s1 = wb.getSheetAt(0)
+            if (s1 != null) {
+                for (i in 2..s1.lastRowNum) {
+                    val row = s1.getRow(i) ?: continue
+                    val plate = row.cellStr(1)
+                    if (plate.isBlank()) continue
+                    vehicles.add(Vehicle(
+                        plateNumber = plate,
+                        vehicleCode = row.cellStr(0),
+                        assignedUser = extractUser(row.cellStr(9)),
+                        brand = row.cellStr(2).ifBlank { "警用摩托车" },
+                        lastMaintenanceDate = parseDate(row.cellStr(6)),
+                        lastMaintenanceKm = parseKm(row.cellStr(7)),
+                        maintenanceIntervalKm = parseInterval(row.cellStr(5), 3000),
+                        maintenanceIntervalDays = parseDaysInterval(row.cellStr(5), 365),
+                        annualInspectionDate = parseDate(row.cellStr(10)),
+                        status = "正常",
+                        notes = row.cellStr(9)
+                    ))
                 }
             }
 
-            // Read maintenance records
-            if (workbook.numberOfSheets > 1) {
-                workbook.getSheetAt(1)?.let { sheet ->
-                    for (i in 1..sheet.lastRowNum) {
-                        val row = sheet.getRow(i) ?: continue
-                        maintenanceRecords.add(
-                            MaintenanceRecord(
-                                vehicleId = row.getCellLong(0),
-                                type = row.getCellString(1),
-                                date = parseDateSafely(row.getCellString(2)),
-                                km = row.getCellInt(3),
-                                items = row.getCellString(4),
-                                location = row.getCellString(5),
-                                price = row.getCellDouble(6),
-                                notes = row.getCellString(7)
-                            )
-                        )
+            // Sheet 2: 维修记录总表
+            if (wb.numberOfSheets > 1) {
+                val s2 = wb.getSheetAt(1)
+                if (s2 != null) {
+                    for (i in 2..s2.lastRowNum) {
+                        val row = s2.getRow(i) ?: continue
+                        val project = row.cellStr(3)
+                        if (project.isBlank()) continue
+                        records.add(MaintenanceRecord(
+                            vehicleId = 0, // will be matched by plate later
+                            type = if (project.contains("保养")) "保养" else "维修",
+                            date = parseDate(row.cellStr(1)),
+                            items = project,
+                            location = row.cellStr(2),
+                            price = row.cellDbl(4)
+                        ))
                     }
                 }
             }
 
-            // Read km records
-            if (workbook.numberOfSheets > 2) {
-                workbook.getSheetAt(2)?.let { sheet ->
-                    for (i in 1..sheet.lastRowNum) {
-                        val row = sheet.getRow(i) ?: continue
-                        kmRecords.add(
-                            KmRecord(
-                                vehicleId = row.getCellLong(0),
-                                km = row.getCellInt(1),
-                                recordDate = parseDateSafely(row.getCellString(2)),
-                                month = row.getCellString(3)
-                            )
-                        )
-                    }
-                }
-            }
-
-            workbook.close()
+            wb.close()
         }
-
-        return ExportData(vehicles, maintenanceRecords, kmRecords, todos)
+        return ExportData(vehicles, records, kmRecs, emptyList())
     }
 
-    private fun createVehicleSheet(
-        workbook: Workbook, vehicles: List<Vehicle>,
-        headerStyle: CellStyle, cellStyle: CellStyle
-    ) {
-        val sheet = workbook.createSheet("车辆档案")
-        val headers = arrayOf(
-            "车牌号", "车辆编号", "使用人", "品牌型号", "购置日期",
-            "最近保养日期", "最近保养公里数", "保养间隔公里数",
-            "保养间隔天数", "年审日期", "状态", "备注"
-        )
-        createHeader(sheet, headers, headerStyle)
-
-        vehicles.forEachIndexed { index, vehicle ->
-            val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(vehicle.plateNumber); setCellStyle(cellStyle) }
-            row.createCell(1).apply { setCellValue(vehicle.vehicleCode); setCellStyle(cellStyle) }
-            row.createCell(2).apply { setCellValue(vehicle.assignedUser); setCellStyle(cellStyle) }
-            row.createCell(3).apply { setCellValue(vehicle.brand); setCellStyle(cellStyle) }
-            row.createCell(4).apply { setCellValue(formatDate(vehicle.purchaseDate)); setCellStyle(cellStyle) }
-            row.createCell(5).apply { setCellValue(formatDate(vehicle.lastMaintenanceDate)); setCellStyle(cellStyle) }
-            row.createCell(6).apply { setCellValue(vehicle.lastMaintenanceKm.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(7).apply { setCellValue(vehicle.maintenanceIntervalKm.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(8).apply { setCellValue(vehicle.maintenanceIntervalDays.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(9).apply { setCellValue(formatDate(vehicle.annualInspectionDate)); setCellStyle(cellStyle) }
-            row.createCell(10).apply { setCellValue(vehicle.status); setCellStyle(cellStyle) }
-            row.createCell(11).apply { setCellValue(vehicle.notes); setCellStyle(cellStyle) }
-        }
-
-        // Auto-size columns
-        for (i in headers.indices) sheet.autoSizeColumn(i)
+    // === helpers ===
+    private fun formatDate(ts: Long): String {
+        if (ts == 0L) return ""
+        val df = java.text.SimpleDateFormat("yyyy.M.d", java.util.Locale.CHINA)
+        return df.format(java.util.Date(ts))
+    }
+    private fun parseDate(s: String): Long {
+        if (s.isBlank()) return 0L
+        return try { java.text.SimpleDateFormat("yyyy.M.d", java.util.Locale.CHINA).parse(s.trim())?.time ?: 0L } catch(e:Exception) { 0L }
+    }
+    private fun parseKm(s: String): Int {
+        val m = Regex("([\\d,]+)").find(s) ?: return 0
+        return m.value.replace(",", "").toIntOrNull() ?: 0
+    }
+    private fun parseInterval(rule: String, default: Int): Int {
+        val m = Regex("(\\d+)\\s*千公里").find(rule) ?: Regex("(\\d+)公里").find(rule)
+        return m?.groupValues?.get(1)?.toIntOrNull()?.times(1000) ?: default
+    }
+    private fun parseDaysInterval(rule: String, default: Int): Int {
+        if (rule.contains("1年")) return 365
+        return default
+    }
+    private fun extractUser(remark: String): String {
+        val m = Regex("使用人[:：]\\s*(.+?)([;；，,]|$)").find(remark)
+        return m?.groupValues?.getOrNull(1)?.trim() ?: ""
     }
 
-    private fun createMaintenanceSheet(
-        workbook: Workbook, records: List<MaintenanceRecord>,
-        headerStyle: CellStyle, cellStyle: CellStyle
-    ) {
-        val sheet = workbook.createSheet("维修保养记录")
-        val headers = arrayOf(
-            "车辆ID", "类型", "日期", "公里数", "项目", "地点", "价格", "备注"
-        )
-        createHeader(sheet, headers, headerStyle)
+    private fun Row.cellStr(idx: Int) = try { getCell(idx)?.stringCellValue ?: "" } catch (_: Exception) { "" }
+    private fun Row.cellInt(idx: Int) = try { getCell(idx)?.numericCellValue?.toInt() ?: 0 } catch (_: Exception) { 0 }
+    private fun Row.cellDbl(idx: Int) = try { getCell(idx)?.numericCellValue ?: 0.0 } catch (_: Exception) { 0.0 }
 
-        records.forEachIndexed { index, record ->
-            val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(record.vehicleId.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(1).apply { setCellValue(record.type); setCellStyle(cellStyle) }
-            row.createCell(2).apply { setCellValue(formatDate(record.date)); setCellStyle(cellStyle) }
-            row.createCell(3).apply { setCellValue(record.km.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(4).apply { setCellValue(record.items); setCellStyle(cellStyle) }
-            row.createCell(5).apply { setCellValue(record.location); setCellStyle(cellStyle) }
-            row.createCell(6).apply { setCellValue(record.price); setCellStyle(cellStyle) }
-            row.createCell(7).apply { setCellValue(record.notes); setCellStyle(cellStyle) }
-        }
-
-        for (i in headers.indices) sheet.autoSizeColumn(i)
+    private fun Row.cell(idx: Int, value: String, style: CellStyle) {
+        createCell(idx).apply { setCellValue(value); cellStyle = style }
     }
-
-    private fun createKmRecordSheet(
-        workbook: Workbook, records: List<KmRecord>,
-        headerStyle: CellStyle, cellStyle: CellStyle
-    ) {
-        val sheet = workbook.createSheet("公里数记录")
-        val headers = arrayOf("车辆ID", "公里数", "记录日期", "所属月份")
-        createHeader(sheet, headers, headerStyle)
-
-        records.forEachIndexed { index, record ->
-            val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(record.vehicleId.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(1).apply { setCellValue(record.km.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(2).apply { setCellValue(formatDate(record.recordDate)); setCellStyle(cellStyle) }
-            row.createCell(3).apply { setCellValue(record.month); setCellStyle(cellStyle) }
-        }
-
-        for (i in headers.indices) sheet.autoSizeColumn(i)
+    private fun row(sheet: Sheet, idx: Int, values: Array<String>, style: CellStyle) {
+        val r = sheet.createRow(idx)
+        values.forEachIndexed { i, v -> r.createCell(i).apply { setCellValue(v); cellStyle = style } }
     }
-
-    private fun createTodoSheet(
-        workbook: Workbook, todos: List<Todo>,
-        headerStyle: CellStyle, cellStyle: CellStyle
-    ) {
-        val sheet = workbook.createSheet("待办事项")
-        val headers = arrayOf("车辆ID", "类型", "标题", "描述", "截止日期", "状态")
-        createHeader(sheet, headers, headerStyle)
-
-        todos.forEachIndexed { index, todo ->
-            val row = sheet.createRow(index + 1)
-            row.createCell(0).apply { setCellValue(todo.vehicleId.toDouble()); setCellStyle(cellStyle) }
-            row.createCell(1).apply { setCellValue(todo.type); setCellStyle(cellStyle) }
-            row.createCell(2).apply { setCellValue(todo.title); setCellStyle(cellStyle) }
-            row.createCell(3).apply { setCellValue(todo.description); setCellStyle(cellStyle) }
-            row.createCell(4).apply { setCellValue(formatDate(todo.dueDate)); setCellStyle(cellStyle) }
-            row.createCell(5).apply { setCellValue(todo.status); setCellStyle(cellStyle) }
-        }
-
-        for (i in headers.indices) sheet.autoSizeColumn(i)
+    private fun headerStyle(wb: Workbook) = wb.createCellStyle().apply {
+        fillForegroundColor = IndexedColors.GREY_25_PERCENT.index; fillPattern = FillPatternType.SOLID_FOREGROUND
+        setFont(wb.createFont().apply { bold = true })
     }
-
-    private fun createHeader(sheet: Sheet, headers: Array<String>, style: CellStyle) {
-        val row = sheet.createRow(0)
-        headers.forEachIndexed { index, header ->
-            row.createCell(index).apply {
-                setCellValue(header)
-                cellStyle = style
-            }
-        }
-    }
-
-    private fun createHeaderStyle(workbook: Workbook): CellStyle {
-        return workbook.createCellStyle().apply {
-            fillForegroundColor = IndexedColors.GREY_25_PERCENT.index
-            fillPattern = FillPatternType.SOLID_FOREGROUND
-            val font = workbook.createFont().apply { bold = true }
-            setFont(font)
-            setBorderBottom(BorderStyle.THIN)
-            setBorderTop(BorderStyle.THIN)
-            setBorderLeft(BorderStyle.THIN)
-            setBorderRight(BorderStyle.THIN)
-        }
-    }
-
-    private fun createCellStyle(workbook: Workbook): CellStyle {
-        return workbook.createCellStyle().apply {
-            setBorderBottom(BorderStyle.THIN)
-            setBorderTop(BorderStyle.THIN)
-            setBorderLeft(BorderStyle.THIN)
-            setBorderRight(BorderStyle.THIN)
-        }
-    }
-
-    private fun formatDate(timestamp: Long): String =
-        if (timestamp == 0L) "" else dateFormat.format(Date(timestamp))
-
-    private fun parseDateSafely(dateStr: String): Long {
-        if (dateStr.isBlank()) return 0L
-        return try {
-            dateFormat.parse(dateStr)?.time ?: 0L
-        } catch (e: Exception) {
-            0L
-        }
-    }
-
-    // Helper extensions for safe cell reading
-    private fun Row.getCellString(index: Int): String {
-        return try { getCell(index)?.stringCellValue ?: "" } catch (e: Exception) { "" }
-    }
-
-    private fun Row.getCellInt(index: Int): Int {
-        return try { getCell(index)?.numericCellValue?.toInt() ?: 0 } catch (e: Exception) { 0 }
-    }
-
-    private fun Row.getCellDouble(index: Int): Double {
-        return try { getCell(index)?.numericCellValue ?: 0.0 } catch (e: Exception) { 0.0 }
-    }
-
-    private fun Row.getCellLong(index: Int): Long {
-        return try { getCell(index)?.numericCellValue?.toLong() ?: 0L } catch (e: Exception) { 0L }
-    }
+    private fun cellStyle(wb: Workbook) = wb.createCellStyle()
 }
