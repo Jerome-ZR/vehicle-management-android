@@ -10,10 +10,12 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("release.keystore")
+            storeFile = rootProject.file("app/release.keystore")
             storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "vehicle2024"
             keyAlias = System.getenv("KEY_ALIAS") ?: "vehicle"
             keyPassword = System.getenv("KEY_PASSWORD") ?: "vehicle2024"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
