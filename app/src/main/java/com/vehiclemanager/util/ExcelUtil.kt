@@ -12,7 +12,8 @@ data class ExportData(
     val vehicles: List<Vehicle>,
     val maintenanceRecords: List<MaintenanceRecord>,
     val kmRecords: List<KmRecord>,
-    val todos: List<Todo>
+    val todos: List<Todo>,
+    val parts: List<Part> = emptyList()
 )
 
 object ExcelUtil {
@@ -72,6 +73,7 @@ object ExcelUtil {
         val vehicles = mutableListOf<Vehicle>()
         val records = mutableListOf<MaintenanceRecord>()
         val kmRecs = mutableListOf<KmRecord>()
+        val parts = mutableListOf<Part>()
         ctx.contentResolver.openInputStream(uri)?.use { s ->
             val wb = WorkbookFactory.create(s)
             val s1 = wb.getSheetAt(0)
@@ -90,9 +92,21 @@ object ExcelUtil {
                         date=parseDate(row.cs(1)), items=pj, location=row.cs(2), price=row.cd(4)))
                 }
             }
+            // Sheet 36: 配件价格表
+            val s36 = wb.getSheet("配件价格表")
+            if (s36 != null) {
+                val pl = mutableListOf<Part>()
+                for (i in 3..s36.lastRowNum) {
+                    val row = s36.getRow(i) ?: continue
+                    val pn = row.cs(1); if(pn.isBlank()) continue
+                    if(row.cd(2) > 0) pl.add(Part(partName=pn, shop="铁马维修", qty=row.cd(2).toInt(), unitPrice=row.cd(3).toInt(), amount=row.cd(4).toInt()))
+                    if(row.cd(5) > 0) pl.add(Part(partName=pn, shop="洪亮价格", qty=row.cd(5).toInt(), unitPrice=row.cd(6).toInt(), amount=row.cd(7).toInt()))
+                }
+                parts.addAll(pl)
+            }
             wb.close()
         }
-        return ExportData(vehicles, records, kmRecs, emptyList())
+        return ExportData(vehicles, records, kmRecs, emptyList(), parts)
     }
 
     // helpers
