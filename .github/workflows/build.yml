@@ -23,36 +23,25 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Setup Keystore
+        env:
+          KS: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "Using permanent keystore from GitHub Secret"
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+          if [ -n "$KS" ]; then
+            echo "✓ Using permanent keystore"
+            echo "$KS" | base64 -d > app/release.keystore
           else
-            echo "⚠️ No KEYSTORE_BASE64 secret found — generating temporary keystore"
-            echo "⚠️ Each build will have a DIFFERENT signature until you save the secret!"
-            echo "⚠️ Steps: download the keystore artifact below, then:"
-            echo "⚠️   gh secret set KEYSTORE_BASE64 -b\"\$(base64 -i release.keystore)\""
+            echo "⚠️ Generating temporary keystore (signature will change each build)"
             keytool -genkeypair \
               -keystore app/release.keystore \
               -alias vehicle \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 36500 \
-              -storepass vehicle2024 \
-              -keypass vehicle2024 \
+              -keyalg RSA -keysize 2048 -validity 36500 \
+              -storepass vehicle2024 -keypass vehicle2024 \
               -dname "CN=VehicleManager, OU=Dev, O=Vehicle, L=Beijing, ST=Beijing, C=CN"
-            cp app/release.keystore release.keystore
+            base64 -w0 app/release.keystore > ks.b64
+            echo "KEYSTORE_BASE64=$(cat ks.b64)" >> $GITHUB_ENV
           fi
 
-      - name: Upload Keystore Artifact (for first-time setup)
-        if: ${{ !secrets.KEYSTORE_BASE64 }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: keystore-for-secret-setup
-          path: release.keystore
-          retention-days: 1
-
-      - name: Grant execute permission for gradlew
+      - name: Grant gradlew permission
         run: chmod +x gradlew
 
       - name: Build Release APK
