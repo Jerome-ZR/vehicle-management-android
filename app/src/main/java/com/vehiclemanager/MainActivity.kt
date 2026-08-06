@@ -14,6 +14,7 @@ import com.vehiclemanager.backup.BackupScreen
 import com.vehiclemanager.ui.home.HomeScreen
 import com.vehiclemanager.ui.kmrecord.KmRecordScreen
 import com.vehiclemanager.ui.maintenance.MaintenanceScreen
+import com.vehiclemanager.ui.parts.PartsScreen
 import com.vehiclemanager.ui.theme.VehicleManagerTheme
 import com.vehiclemanager.ui.todo.TodoScreen
 import com.vehiclemanager.ui.vehicle.VehicleScreen
@@ -40,6 +41,7 @@ sealed class Screen(val route: String) {
     object KmRecord : Screen("km_record")
     object Todos : Screen("todos")
     object Backup : Screen("backup")
+    object Parts : Screen("parts")
 }
 
 @Composable
@@ -90,6 +92,10 @@ fun VehicleManagerApp() {
 
         composable(Screen.Backup.route) {
             BackupScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.Parts.route) {
+            PartsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

@@ -10,4 +10,5 @@ class VehicleApp : Application() {
     val maintenanceRepository by lazy { MaintenanceRepository(database.maintenanceRecordDao()) }
     val kmRecordRepository by lazy { KmRecordRepository(database.kmRecordDao()) }
     val todoRepository by lazy { TodoRepository(database.todoDao()) }
+    val partDao by lazy { database.partDao() }
 }

@@ -6,8 +6,8 @@ import com.vehiclemanager.data.dao.*
 import com.vehiclemanager.data.entity.*
 
 @Database(
-    entities = [Vehicle::class, MaintenanceRecord::class, KmRecord::class, Todo::class],
-    version = 1,
+    entities = [Vehicle::class, MaintenanceRecord::class, KmRecord::class, Todo::class, Part::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -15,6 +15,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun maintenanceRecordDao(): MaintenanceRecordDao
     abstract fun kmRecordDao(): KmRecordDao
     abstract fun todoDao(): TodoDao
+    abstract fun partDao(): PartDao
 
     companion object {
         @Volatile
