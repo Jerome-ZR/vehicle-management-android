@@ -1,3 +1,8 @@
+# Add project specific ProGuard rules here.
+
+# Ignore warnings for optional dependencies not available on Android
+-ignorewarnings
+
 # Keep entity classes for Room database
 -keep class com.vehiclemanager.data.entity.** { *; }
 -keep class com.vehiclemanager.util.BackupData { *; }
@@ -24,7 +29,11 @@
 -dontwarn org.w3c.**
 -dontwarn javax.**
 -dontwarn java.xml.**
+-dontwarn java.awt.**
+-dontwarn com.graphbuilder.**
 -dontwarn schemasMicrosoftCom.**
+-dontwarn org.jcp.**
+-dontwarn com.sun.**
 
 # Keep Gson
 -keepattributes Signature
