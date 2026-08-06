@@ -254,6 +254,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickActionButton(
     icon: ImageVector,
@@ -281,6 +282,7 @@ fun QuickActionButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoReminderCard(todo: com.vehiclemanager.data.entity.Todo, onClick: () -> Unit) {
     val daysLeft = if (todo.dueDate > 0) {

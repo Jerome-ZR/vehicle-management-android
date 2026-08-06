@@ -188,3 +188,16 @@ fun SectionHeader(title: String, action: (@Composable () -> Unit)? = null) {
         action?.invoke()
     }
 }
+
+@Composable
+fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = TextSecondary, fontSize = 14.sp)
+        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}

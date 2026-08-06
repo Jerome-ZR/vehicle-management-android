@@ -241,7 +241,7 @@ fun MaintenanceRecordCard(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider()
+            Divider()
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -297,6 +297,7 @@ fun MaintenanceRecordCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MaintenanceEditForm(
     record: MaintenanceRecord?,
