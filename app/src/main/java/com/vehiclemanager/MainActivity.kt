@@ -5,15 +5,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.vehiclemanager.backup.BackupScreen
 import com.vehiclemanager.data.SeedData
 import com.vehiclemanager.ui.home.HomeScreen
-import com.vehiclemanager.ui.kmrecord.KmRecordScreen
 import com.vehiclemanager.ui.maintenance.MaintenanceScreen
 import com.vehiclemanager.ui.parts.PartsScreen
 import com.vehiclemanager.ui.theme.VehicleManagerTheme
@@ -40,71 +46,42 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-sealed class Screen(val route: String) {
-    object Home : Screen("home")
-    object Vehicles : Screen("vehicles")
-    object Maintenance : Screen("maintenance?vehicleId={vehicleId}") {
-        fun createRoute(vehicleId: Long? = null) =
-            if (vehicleId != null) "maintenance?vehicleId=$vehicleId" else "maintenance"
-    }
-    object KmRecord : Screen("km_record")
-    object Todos : Screen("todos")
-    object Backup : Screen("backup")
-    object Parts : Screen("parts")
+sealed class Screen(val route: String, val label: String) {
+    object Home : Screen("home", "首页")
+    object Vehicles : Screen("vehicles", "车辆")
+    object Maintenance : Screen("maintenance", "维保")
+    object Todos : Screen("todos", "提醒")
+    object Parts : Screen("parts", "配件")
+    object Backup : Screen("backup", "设置")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehicleManagerApp() {
-    val navController = rememberNavController()
+    val nav = rememberNavController()
+    val tabs = listOf(Screen.Home, Screen.Vehicles, Screen.Maintenance, Screen.Todos, Screen.Parts, Screen.Backup)
+    val icons = listOf(Icons.Default.Home, Icons.Default.DirectionsCar, Icons.Default.Build, Icons.Default.Notifications, Icons.Default.ShoppingCart, Icons.Default.Settings)
 
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Home.route
-    ) {
-        composable(Screen.Home.route) {
-            HomeScreen(
-                onNavigateToVehicles = { navController.navigate(Screen.Vehicles.route) },
-                onNavigateToMaintenance = { navController.navigate(Screen.Maintenance.createRoute()) },
-                onNavigateToKmRecord = { navController.navigate(Screen.KmRecord.route) },
-                onNavigateToTodos = { navController.navigate(Screen.Todos.route) },
-                onNavigateToBackup = { navController.navigate(Screen.Backup.route) }
-            )
+    Scaffold(bottomBar = {
+        NavigationBar {
+            val route = nav.currentBackStackEntryAsState().value?.destination?.route
+            tabs.forEach { tab ->
+                NavigationBarItem(
+                    icon = { Icon(icons[tabs.indexOf(tab)], tab.label) },
+                    label = { Text(tab.label, fontWeight = FontWeight.Medium) },
+                    selected = route == tab.route,
+                    onClick = { nav.navigate(tab.route) { popUpTo(Screen.Home.route){saveState=true}; launchSingleTop=true; restoreState=true } }
+                )
+            }
         }
-
-        composable(Screen.Vehicles.route) {
-            VehicleScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(
-            route = Screen.Maintenance.route,
-            arguments = listOf(
-                navArgument("vehicleId") {
-                    type = NavType.LongType
-                    defaultValue = -1L
-                }
-            )
-        ) { backStackEntry ->
-            val vehicleId = backStackEntry.arguments?.getLong("vehicleId") ?: -1L
-            MaintenanceScreen(
-                vehicleId = if (vehicleId > 0) vehicleId else null,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(Screen.KmRecord.route) {
-            KmRecordScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(Screen.Todos.route) {
-            TodoScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(Screen.Backup.route) {
-            BackupScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(Screen.Parts.route) {
-            PartsScreen(onBack = { navController.popBackStack() })
+    }) { p ->
+        NavHost(nav, Screen.Home.route, Modifier.padding(p)) {
+            composable(Screen.Home.route) { HomeScreen(onNavigateToVehicles={nav.navigate(Screen.Vehicles.route)}, onNavigateToMaintenance={nav.navigate(Screen.Maintenance.route)}, onNavigateToKmRecord={nav.navigate(Screen.Parts.route)}, onNavigateToTodos={nav.navigate(Screen.Todos.route)}, onNavigateToBackup={nav.navigate(Screen.Backup.route)}) }
+            composable(Screen.Vehicles.route) { VehicleScreen(onBack={nav.popBackStack()}) }
+            composable(Screen.Maintenance.route) { MaintenanceScreen(vehicleId=null, onBack={nav.popBackStack()}) }
+            composable(Screen.Todos.route) { TodoScreen(onBack={nav.popBackStack()}) }
+            composable(Screen.Parts.route) { PartsScreen(onBack={nav.popBackStack()}) }
+            composable(Screen.Backup.route) { BackupScreen(onBack={nav.popBackStack()}) }
         }
     }
 }
